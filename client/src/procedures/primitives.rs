@@ -54,6 +54,7 @@ pub enum StrongholdProcedure {
     GenerateKey(GenerateKey),
     Ed25519Sign(Ed25519Sign),
     Secp256k1EcdsaSign(Secp256k1EcdsaSign),
+    BLS12_377Sign(BLS12_377Sign),
     X25519DiffieHellman(X25519DiffieHellman),
     Hmac(Hmac),
     Hkdf(Hkdf),
@@ -725,6 +726,14 @@ pub struct Secp256k1EcdsaSign {
 
     pub private_key: Location,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BLS12_377Sign {
+    pub msg: Vec<u8>,
+
+    pub private_key: Location,
+}
+
 
 impl UseSecret<1> for Secp256k1EcdsaSign {
     type Output = [u8; secp256k1_ecdsa::RecoverableSignature::LENGTH];
