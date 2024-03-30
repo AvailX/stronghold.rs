@@ -1,7 +1,7 @@
 // Copyright 2020-2021 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{convert::TryInto, str::FromStr};
+use std::{convert::TryInto, str::FromStr, thread::Thread};
 
 use super::types::*;
 use crate::{derive_record_id, derive_vault_id, Client, ClientError, Location, UseKey};
@@ -31,9 +31,14 @@ use crypto::{
 };
 
 use engine::runtime::memories::buffer::{Buffer, Ref};
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use stronghold_utils::GuardDebug;
 use zeroize::{Zeroize, Zeroizing};
+
+use snarkvm_console::{account::{Address as AleoAddress, PrivateKey as AleoPrivateKey, ViewKey as AleoViewKey}, program::{FromBytes, Identifier, ToBytes}};
+use snarkvm_console::network::Network;
+use snarkvm_console::prelude::Error as AleoError;
 
 /// Enum that wraps all cryptographic procedures that are supported by Stronghold.
 ///
@@ -54,7 +59,7 @@ pub enum StrongholdProcedure {
     GenerateKey(GenerateKey),
     Ed25519Sign(Ed25519Sign),
     Secp256k1EcdsaSign(Secp256k1EcdsaSign),
-    BLS12_377Sign(BLS12_377Sign),
+    AleoSign(AleoSign),
     X25519DiffieHellman(X25519DiffieHellman),
     Hmac(Hmac),
     Hkdf(Hkdf),
@@ -89,6 +94,7 @@ impl Procedure for StrongholdProcedure {
             GetEvmAddress(proc) => proc.execute(runner).map(|o| o.into()),
             Ed25519Sign(proc) => proc.execute(runner).map(|o| o.into()),
             Secp256k1EcdsaSign(proc) => proc.execute(runner).map(|o| o.into()),
+            AleoSign(proc) => proc.execute(runner).map(|o| o.into()),
             X25519DiffieHellman(proc) => proc.execute(runner).map(|o| o.into()),
             Hmac(proc) => proc.execute(runner).map(|o| o.into()),
             Hkdf(proc) => proc.execute(runner).map(|o| o.into()),
@@ -612,6 +618,15 @@ fn secp256k1_ecdsa_secret_key(raw: Ref<u8>) -> Result<secp256k1_ecdsa::SecretKey
     secp256k1_ecdsa::SecretKey::try_from_bytes(raw_slice[..secp256k1_ecdsa::SecretKey::LENGTH].try_into().unwrap())
 }
 
+fn aleo_secret_key<N:Network>(raw: Ref<u8>) -> Result<AleoPrivateKey<N>,AleoError>{
+    let raw_slice: &[u8] = &raw;
+    if raw_slice.len() < 128 {
+        // Return buffer size error
+    }
+
+    AleoPrivateKey::<N>::from_bytes_le(raw_slice)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenerateKey {
     pub ty: KeyType,
@@ -687,6 +702,13 @@ impl UseSecret<1> for GetEvmAddress {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetAleoAddress{
+    pub private_key: Location,
+}
+
+
+
 /// Use the specified Ed25519 compatible key to sign the given message
 ///
 /// Compatible keys are any record that contain the desired key material in the first 32 bytes,
@@ -728,10 +750,35 @@ pub struct Secp256k1EcdsaSign {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BLS12_377Sign {
+#[serde(bound = "N: Network")]
+pub struct AleoSign<N:Network>{
     pub msg: Vec<u8>,
 
     pub private_key: Location,
+
+    pub network_ext: Identifier<N>
+}
+
+impl<N:Network> UseSecret<1> for AleoSign<N> {
+    type Output = [u8; 128];
+
+    fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
+        let sk = aleo_secret_key::<N>(guards[0].borrow())?;
+
+        let rng = &mut  rand::thread_rng();
+
+        let sig = sk.sign_bytes(&self.msg, rng)?;
+
+        let sig_bytes = sig.to_bytes_le()?;
+        
+        let sig_safe: [u8; 128] = sig_bytes.try_into().unwrap();
+
+        Ok(sig_safe)
+    }
+
+    fn source(&self) -> [Location; 1] {
+        [self.private_key.clone()]
+    }
 }
 
 

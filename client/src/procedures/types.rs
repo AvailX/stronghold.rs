@@ -7,6 +7,8 @@ use engine::{
     runtime::memories::buffer::Buffer,
     vault::{BoxProvider, VaultId},
 };
+use snarkvm_console::prelude::Error as AleoError;
+
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, string::FromUtf8Error};
 use thiserror::Error as DeriveError;
@@ -217,6 +219,12 @@ pub struct FatalProcedureError(String);
 
 impl From<crypto::Error> for FatalProcedureError {
     fn from(e: crypto::Error) -> Self {
+        FatalProcedureError(e.to_string())
+    }
+}
+
+impl From<AleoError> for FatalProcedureError {
+    fn from(e: AleoError) -> Self {
         FatalProcedureError(e.to_string())
     }
 }
