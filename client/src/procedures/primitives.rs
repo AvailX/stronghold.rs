@@ -708,6 +708,19 @@ pub struct GetAleoAddress{
     pub private_key: Location,
 }
 
+impl UseSecret<1> for GetAleoAddress{
+    type Output = AleoAddress<Testnet3>;
+
+    fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
+        let sk = aleo_secret_key::<Testnet3>(guards[0].borrow())?;
+        Ok(AleoAddress::try_from(&sk).unwrap())
+    }
+
+    fn source(&self) -> [Location; 1] {
+        [self.private_key.clone()]
+    }
+}
+
 
 
 /// Use the specified Ed25519 compatible key to sign the given message
