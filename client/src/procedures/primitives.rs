@@ -56,6 +56,7 @@ pub enum StrongholdProcedure {
     BIP39Recover(BIP39Recover),
     PublicKey(PublicKey),
     GetEvmAddress(GetEvmAddress),
+    GetAleoAddress(GetAleoAddress),
     GenerateKey(GenerateKey),
     Ed25519Sign(Ed25519Sign),
     Secp256k1EcdsaSign(Secp256k1EcdsaSign),
@@ -92,6 +93,7 @@ impl Procedure for StrongholdProcedure {
             GenerateKey(proc) => proc.execute(runner).map(|o| o.into()),
             PublicKey(proc) => proc.execute(runner).map(|o| o.into()),
             GetEvmAddress(proc) => proc.execute(runner).map(|o| o.into()),
+            GetAleoAddress(proc) => proc.execute(runner).map(|o| o.into()),
             Ed25519Sign(proc) => proc.execute(runner).map(|o| o.into()),
             Secp256k1EcdsaSign(proc) => proc.execute(runner).map(|o| o.into()),
             AleoSign(proc) => proc.execute(runner).map(|o| o.into()),
@@ -126,6 +128,7 @@ impl StrongholdProcedure {
             })
             | StrongholdProcedure::PublicKey(PublicKey { private_key: input, .. })
             | StrongholdProcedure::GetEvmAddress(GetEvmAddress { private_key: input })
+            | StrongholdProcedure::GetAleoAddress(GetAleoAddress { private_key: input })
             | StrongholdProcedure::Ed25519Sign(Ed25519Sign { private_key: input, .. })
             | StrongholdProcedure::Secp256k1EcdsaSign(Secp256k1EcdsaSign { private_key: input, .. })
             | StrongholdProcedure::AleoSign(AleoSign { private_key: input, .. })
@@ -218,7 +221,7 @@ generic_procedures! {
 
 generic_procedures! {
     // Stronghold procedures that implement the `UseSecret` trait.
-    UseSecret<1> => { PublicKey, GetEvmAddress, Ed25519Sign, Secp256k1EcdsaSign, AleoSign, Hmac, AeadEncrypt, AeadDecrypt },
+    UseSecret<1> => { PublicKey, GetEvmAddress, GetAleoAddress, Ed25519Sign, Secp256k1EcdsaSign, AleoSign, Hmac, AeadEncrypt, AeadDecrypt },
     UseSecret<2> => { AesKeyWrapEncrypt },
     // Stronghold procedures that implement the `DeriveSecret` trait.
     DeriveSecret<1> => { CopyRecord, Slip10Derive, X25519DiffieHellman, Hkdf, ConcatKdf, AesKeyWrapDecrypt },
@@ -709,11 +712,14 @@ pub struct GetAleoAddress{
 }
 
 impl UseSecret<1> for GetAleoAddress{
-    type Output = AleoAddress<Testnet3>;
+    type Output = [u8;32];
 
     fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
         let sk = aleo_secret_key::<Testnet3>(guards[0].borrow())?;
-        Ok(AleoAddress::try_from(&sk).unwrap())
+        let address =AleoAddress::try_from(&sk).unwrap();
+        let addr_bytes = address.to_bytes_le()?;
+        let addr_safe : [u8;32] = addr_bytes.try_into().unwrap();
+        Ok(addr_safe)
     }
 
     fn source(&self) -> [Location; 1] {
