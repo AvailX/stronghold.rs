@@ -20,7 +20,7 @@ insecure = [ ]
 thiserror = { version = "1.0.30" }
 zeroize = { version = "1.5.7", default-features = false, features = [ "zeroize_derive", "serde" ] }
 serde = { version = "1.0", features = [ "derive" ] }
-iota-crypto = { version = "0.23", default-features = false, features = [
+iota-crypto = { git="https://github.com/AvailX/crypto.rs", rev="4200366", default-features = false, features = [
   "aes-gcm",
   "blake2b",
   "aes-kw",
@@ -35,7 +35,8 @@ iota-crypto = { version = "0.23", default-features = false, features = [
   "bip39-jp",
   "slip10",
   "chacha",
-  "x25519"
+  "x25519",
+  "aleo"
 ] }
 hkdf = { version = "0.12" }
 bincode = { version = "1.3" }

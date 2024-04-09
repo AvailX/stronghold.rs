@@ -487,6 +487,7 @@ pub enum Slip10DeriveInput {
 pub enum Curve {
     Secp256k1,
     Ed25519,
+    Aleo //BLS12_377
 }
 
 /// Derive a SLIP10 child key from a seed or a parent key, store it in output location and
@@ -495,7 +496,7 @@ pub enum Curve {
 pub struct Slip10Derive {
     pub curve: Curve,
 
-    pub chain: Slip10Chain,
+    pub chain: Slip10Chain, // ALEO_HARDENED_OFFSET = 0x80000000;
 
     pub input: Slip10DeriveInput,
 
@@ -545,6 +546,12 @@ impl DeriveSecret<1> for Slip10Derive {
                             .map(|parent| parent.derive(self.chain.into_iter()))
                             .map(get_result)
                     }
+                    Curve::Aleo => {
+                        let hardened_chain = try_into_hardened_chain(self.chain)?;
+                        slip10::Slip10::<AleoPrivateKey<Testnet3>>::try_from_extended_bytes(&ext_bytes)
+                            .map(|parent| parent.derive(hardened_chain.into_iter()))
+                            .map(get_result)
+                    }
                 }
             }
             Slip10DeriveInput::Seed(_) => match self.curve {
@@ -557,6 +564,12 @@ impl DeriveSecret<1> for Slip10Derive {
                 Curve::Secp256k1 => {
                     let dk = slip10::Seed::from_bytes(&guards[0].borrow())
                         .derive::<secp256k1_ecdsa::SecretKey, _>(self.chain.into_iter());
+                    Ok(get_result(dk))
+                }
+                Curve::Aleo => {
+                    let hardened_chain = try_into_hardened_chain(self.chain)?;
+                    let dk = slip10::Seed::from_bytes(&guards[0].borrow())
+                        .derive::<AleoPrivateKey<Testnet3>, _>(hardened_chain.into_iter());
                     Ok(get_result(dk))
                 }
             },
