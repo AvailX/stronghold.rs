@@ -795,12 +795,15 @@ impl UseSecret<1> for AleoSign {
     fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
         let sk = aleo_secret_key::<Testnet3>(guards[0].borrow())?;
 
+        println!("Signing message: {:?}", &self.msg);
+        println!("Signing key: {:?}", &sk.to_string());
+
         let rng = &mut  rand::thread_rng();
 
         let sig = sk.sign_bytes(&self.msg, rng)?;
 
         let sig_bytes = sig.to_bytes_le()?;
-        
+
         let sig_safe: [u8; 128] = sig_bytes.try_into().unwrap();
 
         Ok(sig_safe)
