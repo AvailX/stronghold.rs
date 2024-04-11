@@ -39,6 +39,7 @@ use zeroize::{Zeroize, Zeroizing};
 use snarkvm_console::{account::{Address as AleoAddress, PrivateKey as AleoPrivateKey, ViewKey as AleoViewKey}, network::Testnet3, program::{FromBytes, Identifier, ToBytes}};
 use snarkvm_console::network::Network;
 use snarkvm_console::prelude::Error as AleoError;
+use snarkvm_console::prelude::*;
 
 /// Enum that wraps all cryptographic procedures that are supported by Stronghold.
 ///
@@ -644,7 +645,8 @@ fn aleo_secret_key<N:Network>(raw: Ref<u8>) -> Result<AleoPrivateKey<N>,AleoErro
         // Return buffer size error
     }
 
-    AleoPrivateKey::<N>::from_bytes_le(raw_slice)
+    let field = <N as Environment>::Field::from_bytes_le_mod_order(raw_slice);
+    AleoPrivateKey::<N>::try_from(FromBytes::read_le(&*field.to_bytes_le().unwrap()).unwrap())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
