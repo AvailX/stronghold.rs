@@ -574,6 +574,9 @@ impl DeriveSecret<1> for Slip10Derive {
                 }
             },
         }?;
+
+        println!("PK Extended bytes: {:?}", &extended_bytes);
+
         Ok(Products {
             secret: extended_bytes,
             output: chain_code,
