@@ -80,17 +80,17 @@ pub trait GenerateSecret: Sized {
 }
 
 /// Trait for procedures that use an existing secret to derive a new one.
-pub trait DeriveSecret<const N: usize>: Sized {
+pub trait DeriveSecret<const T: usize>: Sized {
     type Output;
 
-    fn derive(self, guard: [Buffer<u8>; N]) -> Result<Products<Self::Output>, FatalProcedureError>;
+    fn derive(self, guard: [Buffer<u8>; T]) -> Result<Products<Self::Output>, FatalProcedureError>;
 
-    fn source(&self) -> [Location; N];
+    fn source(&self) -> [Location; T];
 
     fn target(&self) -> &Location;
 
     fn exec<R: Runner>(self, runner: &R) -> Result<Self::Output, ProcedureError> {
-        let sources: [Location; N] = self.source();
+        let sources: [Location; T] = self.source();
         let target = self.target();
         let target = target.clone();
         let f = |guard| self.derive(guard);
@@ -100,15 +100,30 @@ pub trait DeriveSecret<const N: usize>: Sized {
 }
 
 /// Trait for procedures that use an existing secret.
-pub trait UseSecret<const N: usize>: Sized {
+pub trait UseSecret<const T: usize>: Sized {
     type Output;
 
-    fn use_secret(self, guard: [Buffer<u8>; N]) -> Result<Self::Output, FatalProcedureError>;
+    fn use_secret(self, guard: [Buffer<u8>; T]) -> Result<Self::Output, FatalProcedureError>;
 
-    fn source(&self) -> [Location; N];
+    fn source(&self) -> [Location; T];
 
     fn exec<R: Runner>(self, runner: &R) -> Result<Self::Output, ProcedureError> {
-        let source: [Location; N] = self.source();
+        let source: [Location; T] = self.source();
+        let f = |guard| self.use_secret(guard);
+        let output = runner.get_guards(source, f)?;
+        Ok(output)
+    }
+}
+
+pub trait UseSecretNetwork<const T: usize, N:Network>: Sized {
+    type Output;
+
+    fn use_secret(self, guard: [Buffer<u8>; T]) -> Result<Self::Output, FatalProcedureError>;
+
+    fn source(&self) -> [Location; T];
+
+    fn exec<R: Runner>(self, runner: &R) -> Result<Self::Output, ProcedureError> {
+        let source: [Location; T] = self.source();
         let f = |guard| self.use_secret(guard);
         let output = runner.get_guards(source, f)?;
         Ok(output)

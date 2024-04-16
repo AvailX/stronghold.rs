@@ -25,6 +25,8 @@ use std::{
 use stronghold_utils::GuardDebug;
 use zeroize::Zeroize;
 
+use snarkvm_console::prelude::Network;
+
 
 #[derive(Clone, GuardDebug)]
 pub struct Client {
@@ -225,9 +227,10 @@ impl Client {
     /// A cryptographic [`Procedure`] is the main operation on secrets.
     ///
     /// # Example
-    pub fn execute_procedure<P>(&self, procedure: P) -> Result<P::Output, ProcedureError>
+    pub fn execute_procedure<P,N>(&self, procedure: P) -> Result<P::Output, ProcedureError>
     where
-        P: Procedure + Into<StrongholdProcedure>,
+        P: Procedure + Into<StrongholdProcedure<N>>,
+        N: Network,
     {
         let res = self.execute_procedure_chained(vec![procedure.into()]);
         let mapped = res.map(|mut vec| vec.pop().unwrap().try_into().ok().unwrap())?;
@@ -237,9 +240,9 @@ impl Client {
     /// Executes a list of cryptographic [`crate::procedures::Procedure`]s sequentially and returns a collected output
     ///
     /// # Example
-    pub fn execute_procedure_chained(
+    pub fn execute_procedure_chained<N:Network>(
         &self,
-        procedures: Vec<StrongholdProcedure>,
+        procedures: Vec<StrongholdProcedure<N>>,
     ) -> core::result::Result<Vec<ProcedureOutput>, ProcedureError> {
         let mut out = Vec::new();
         let mut log = Vec::new();
