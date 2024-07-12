@@ -41,6 +41,10 @@ use snarkvm_console::{account::{Address as AleoAddress, ComputeKey, GraphKey, Pr
 use snarkvm_console::prelude::Error as AleoError;
 use snarkvm_console::prelude::*;
 
+use snarkvm_ledger_query::query::Query;
+
+use snarkvm_ledger_store::consensus::{ConsensusStore, ConsensusStorage};
+
 /// Enum that wraps all cryptographic procedures that are supported by Stronghold.
 ///
 /// A procedure performs a (cryptographic) operation on a secret in the vault and/
@@ -64,6 +68,7 @@ pub enum StrongholdProcedure<N:Network> {
     Secp256k1EcdsaSign(Secp256k1EcdsaSign),
     AleoSign(AleoSign<N>),
     AleoSignRequest(AleoSignRequest<N>),
+    AleoExecute(AleoExecute<N>);
     X25519DiffieHellman(X25519DiffieHellman),
     Hmac(Hmac),
     Hkdf(Hkdf),
@@ -101,6 +106,7 @@ impl<N:Network> Procedure for StrongholdProcedure<N> {
             Secp256k1EcdsaSign(proc) => proc.execute(runner).map(|o| o.into()),
             AleoSign(proc) => proc.exec(runner).map(|o| o.into()),
             AleoSignRequest(proc) => proc.exec(runner).map(|o| o.into()),
+            AleoExecute(proc) => proc.exec(runner).map(|o| o.into()),
             X25519DiffieHellman(proc) => proc.execute(runner).map(|o| o.into()),
             Hmac(proc) => proc.execute(runner).map(|o| o.into()),
             Hkdf(proc) => proc.execute(runner).map(|o| o.into()),
@@ -123,19 +129,20 @@ impl<N:Network> StrongholdProcedure<N> {
         match self {
             StrongholdProcedure::CopyRecord(CopyRecord { source: input, .. })
             | StrongholdProcedure::Slip10Derive(Slip10Derive {
-                input: Slip10DeriveInput::Seed(input),
-                ..
-            })
+                                                    input: Slip10DeriveInput::Seed(input),
+                                                    ..
+                                                })
             | StrongholdProcedure::Slip10Derive(Slip10Derive {
-                input: Slip10DeriveInput::Key(input),
-                ..
-            })
+                                                    input: Slip10DeriveInput::Key(input),
+                                                    ..
+                                                })
             | StrongholdProcedure::PublicKey(PublicKey { private_key: input, .. })
             | StrongholdProcedure::GetEvmAddress(GetEvmAddress { private_key: input })
-            | StrongholdProcedure::GetAleoAddress(GetAleoAddress { private_key: input,.. })
+            | StrongholdProcedure::GetAleoAddress(GetAleoAddress { private_key: input, .. })
             | StrongholdProcedure::Ed25519Sign(Ed25519Sign { private_key: input, .. })
             | StrongholdProcedure::Secp256k1EcdsaSign(Secp256k1EcdsaSign { private_key: input, .. })
             | StrongholdProcedure::AleoSign(AleoSign { private_key: input, .. })
+            | StrongholdProcedure::AleoExecute(AleoExecute{ private_key: input, .. })
             | StrongholdProcedure::X25519DiffieHellman(X25519DiffieHellman { private_key: input, .. })
             | StrongholdProcedure::Hkdf(Hkdf { ikm: input, .. })
             | StrongholdProcedure::ConcatKdf(ConcatKdf {
@@ -813,6 +820,47 @@ pub struct Secp256k1EcdsaSign {
     pub private_key: Location,
 }
 
+
+#[derive(Debug,Clone,Serialize,Deserialize)]
+#[serde(bound = "N: Network")]
+pub struct AleoExecute<N: Network> {
+    private_key: &PrivateKey<N>,
+    program_id: impl TryInto<ProgramID<N>>,
+    function_name: impl TryInto<Identifier<N>>,
+    inputs: impl ExactSizeIterator<Item = impl TryInto<Value<N>>>,
+    fee_record: Option<Record<N, Plaintext<N>>>,
+    priority_fee_in_microcredits: u64,
+}
+
+impl<N: Network> UseSecret<1> for AleoExecute<N> {
+    type Output = Transaction<N>;
+
+    fn use_secret(self, guard: [Buffer<u8>; T]) -> Result<Self::Output, FatalProcedureError> {
+        let private_key = aleo_secret_key::<N>(guards[0].borrow())?;
+        let base_url = format!(
+            "https://aleo-testnet3.obscura.build/v1/{}",
+            env!("TESTNET_API_OBSCURA");
+        );
+        let rng = &mut rand::thread_rng();
+        let store = ConsensusStore::<N, ConsensusMemory<N>>::open(None)?;
+        let vm = VM::<N, ConsensusMemory<N>>::from(store)?;
+
+        Ok(
+            vm,
+            private_key,
+            (self.program_id, self.function_name),
+            self.inputs,
+            self.fee_record,
+            self.priority_fee,
+            Query::from(base_url),
+            rng,
+        )
+    }
+
+    fn source(&self) -> [Location; 1] {
+        [self.private_key.clone()]
+    }
+}
 
 #[derive(Debug,Clone,Serialize,Deserialize)]
 #[serde(bound = "N: Network")]

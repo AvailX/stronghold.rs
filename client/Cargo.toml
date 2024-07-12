@@ -48,6 +48,8 @@ stronghold_derive = { package = "stronghold-derive", path = "../derive", version
 rust-argon2 = { version = "=1.0.0" }
 snarkvm-console = {version = "0.16.19", git = "https://github.com/AvailX/snarkVM", rev="34cb735" }
 rand = { version = "0.8.4" }
+snarkvm-ledger-query = { version = "0.16.19" }
+snarkvm-ledger-store = { version = "0.16.19" }
 
 [dev-dependencies]
 tokio = { version = "1.15.0", features = [ "full" ] }
