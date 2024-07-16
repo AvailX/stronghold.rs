@@ -824,7 +824,7 @@ pub struct Secp256k1EcdsaSign {
 #[derive(Debug,Clone,Serialize,Deserialize)]
 #[serde(bound = "N: Network")]
 pub struct AleoExecute<N: Network> {
-    private_key: &PrivateKey<N>,
+    private_key: Location,
     program_id: impl TryInto<ProgramID<N>>,
     function_name: impl TryInto<Identifier<N>>,
     inputs: impl ExactSizeIterator<Item = impl TryInto<Value<N>>>,
@@ -851,7 +851,7 @@ impl<N: Network> UseSecret<1> for AleoExecute<N> {
             (self.program_id, self.function_name),
             self.inputs,
             self.fee_record,
-            self.priority_fee,
+            self.priority_fee_in_microcredits,
             Query::from(base_url),
             rng,
         )
