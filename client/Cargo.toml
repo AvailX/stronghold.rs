@@ -50,6 +50,8 @@ snarkvm-console = {version = "0.16.19", git = "https://github.com/AvailX/snarkVM
 rand = { version = "0.8.4" }
 snarkvm-ledger-query = { version = "0.16.19" }
 snarkvm-ledger-store = { version = "0.16.19" }
+snarkvm-ledger-block = { version = "0.16.19" }
+snarkvm-synthesizer = { version = "0.16.19" }
 
 [dev-dependencies]
 tokio = { version = "1.15.0", features = [ "full" ] }

@@ -40,10 +40,10 @@ use zeroize::{Zeroize, Zeroizing};
 use snarkvm_console::{account::{Address as AleoAddress, ComputeKey, GraphKey, PrivateKey as AleoPrivateKey, ViewKey as AleoViewKey}, network::{MainnetV0, Network, TestnetV0}, program::{FromBytes, Identifier, InputID, Plaintext, ProgramID, Record, Request, Signature, ToBytes, Value, ValueType}, types::{Field, U16, U8}};
 use snarkvm_console::prelude::Error as AleoError;
 use snarkvm_console::prelude::*;
-
-use snarkvm_ledger_query::query::Query;
-
-use snarkvm_ledger_store::consensus::{ConsensusStore, ConsensusStorage};
+use snarkvm_ledger_query::Query;
+use snarkvm_ledger_store::{ConsensusStore, ConsensusStorage, ConsensusMemory};
+use snarkvm_synthesizer::VM;
+use snarkvm_ledger_block::*;
 
 /// Enum that wraps all cryptographic procedures that are supported by Stronghold.
 ///
@@ -68,7 +68,7 @@ pub enum StrongholdProcedure<N:Network> {
     Secp256k1EcdsaSign(Secp256k1EcdsaSign),
     AleoSign(AleoSign<N>),
     AleoSignRequest(AleoSignRequest<N>),
-    AleoExecute(AleoExecute<N>);
+    AleoExecute(AleoExecute<N>),
     X25519DiffieHellman(X25519DiffieHellman),
     Hmac(Hmac),
     Hkdf(Hkdf),
@@ -835,18 +835,18 @@ pub struct AleoExecute<N: Network> {
 impl<N: Network> UseSecret<1> for AleoExecute<N> {
     type Output = Transaction<N>;
 
-    fn use_secret(self, guard: [Buffer<u8>; T]) -> Result<Self::Output, FatalProcedureError> {
+    fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
         let private_key = aleo_secret_key::<N>(guards[0].borrow())?;
         let base_url = format!(
             "https://aleo-testnet3.obscura.build/v1/{}",
-            env!("TESTNET_API_OBSCURA");
+            env!("TESTNET_API_OBSCURA")
         );
         let rng = &mut rand::thread_rng();
         let store = ConsensusStore::<N, ConsensusMemory<N>>::open(None)?;
         let vm = VM::<N, ConsensusMemory<N>>::from(store)?;
 
         Ok(
-            vm,
+            vm.execute(
             private_key,
             (self.program_id, self.function_name),
             self.inputs,
@@ -854,7 +854,7 @@ impl<N: Network> UseSecret<1> for AleoExecute<N> {
             self.priority_fee_in_microcredits,
             Query::from(base_url),
             rng,
-        )
+        ))
     }
 
     fn source(&self) -> [Location; 1] {
