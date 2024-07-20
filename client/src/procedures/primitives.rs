@@ -40,10 +40,11 @@ use zeroize::{Zeroize, Zeroizing};
 use snarkvm_console::{account::{Address as AleoAddress, ComputeKey, GraphKey, PrivateKey as AleoPrivateKey, ViewKey as AleoViewKey}, network::{MainnetV0, Network, TestnetV0}, program::{FromBytes, Identifier, InputID, Plaintext, ProgramID, Record, Request, Signature, ToBytes, Value, ValueType}, types::{Field, U16, U8}};
 use snarkvm_console::prelude::Error as AleoError;
 use snarkvm_console::prelude::*;
-use snarkvm_ledger_query::Query;
-use snarkvm_ledger_store::{ConsensusStore, ConsensusStorage, ConsensusMemory};
+use snarkvm_ledger::query::Query;
+use snarkvm_ledger::store::{ConsensusStore, ConsensusStorage, helpers::memory::ConsensusMemory};
+use snarkvm_ledger::block::*;
 use snarkvm_synthesizer::VM;
-use snarkvm_ledger_block::*;
+
 
 /// Enum that wraps all cryptographic procedures that are supported by Stronghold.
 ///
@@ -825,9 +826,9 @@ pub struct Secp256k1EcdsaSign {
 #[serde(bound = "N: Network")]
 pub struct AleoExecute<N: Network> {
     private_key: Location,
-    program_id: impl TryInto<ProgramID<N>>,
-    function_name: impl TryInto<Identifier<N>>,
-    inputs: impl ExactSizeIterator<Item = impl TryInto<Value<N>>>,
+    program_id: ProgramID<N>,
+    function_name: Identifier<N>,
+    inputs: Vec<Value<N>>,
     fee_record: Option<Record<N, Plaintext<N>>>,
     priority_fee_in_microcredits: u64,
 }
