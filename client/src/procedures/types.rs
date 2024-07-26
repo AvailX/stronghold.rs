@@ -7,7 +7,8 @@ use engine::{
     runtime::memories::buffer::Buffer,
     vault::{BoxProvider, VaultId},
 };
-use snarkvm_console::{prelude::Error as AleoError, prelude::Network};
+use snarkvm_console::prelude::{Error as AleoError, Network, ToBytes};
+use snarkvm_ledger::block::Transaction;
 
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, string::FromUtf8Error};
@@ -162,6 +163,12 @@ impl From<bip39::Mnemonic> for ProcedureOutput {
 impl<const N: usize> From<[u8; N]> for ProcedureOutput {
     fn from(a: [u8; N]) -> Self {
         a.to_vec().into()
+    }
+}
+
+impl<N: Network> From<Transaction<N>> for ProcedureOutput {
+    fn from(t: Transaction<N>) -> Self {
+        t.to_bytes_le().unwrap().into()
     }
 }
 

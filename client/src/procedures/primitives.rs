@@ -848,14 +848,14 @@ impl<N: Network> UseSecret<1> for AleoExecute<N> {
 
         Ok(
             vm.execute(
-            private_key,
+            &private_key,
             (self.program_id, self.function_name),
-            self.inputs,
+            self.inputs.into_iter(),
             self.fee_record,
             self.priority_fee_in_microcredits,
-            Query::from(base_url),
+            Some(Query::from(base_url)),
             rng,
-        ))
+        )?)
     }
 
     fn source(&self) -> [Location; 1] {
