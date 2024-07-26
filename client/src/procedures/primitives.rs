@@ -839,7 +839,7 @@ impl<N: Network> UseSecret<1> for AleoExecute<N> {
     fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
         let private_key = aleo_secret_key::<N>(guards[0].borrow())?;
         let base_url = format!(
-            "https://aleo-testnet3.obscura.build/v1/{}",
+            "https://aleo-testnetbeta.obscura.network/v1/{}",
             env!("TESTNET_API_OBSCURA")
         );
         let rng = &mut rand::thread_rng();
