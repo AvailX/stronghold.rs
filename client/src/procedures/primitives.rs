@@ -825,12 +825,12 @@ pub struct Secp256k1EcdsaSign {
 #[derive(Debug,Clone,Serialize,Deserialize)]
 #[serde(bound = "N: Network")]
 pub struct AleoExecute<N: Network> {
-    private_key: Location,
-    program_id: ProgramID<N>,
-    function_name: Identifier<N>,
-    inputs: Vec<Value<N>>,
-    fee_record: Option<Record<N, Plaintext<N>>>,
-    priority_fee_in_microcredits: u64,
+    pub private_key: Location,
+    pub program_id: ProgramID<N>,
+    pub function_name: Identifier<N>,
+    pub inputs: Vec<Value<N>>,
+    pub fee_record: Option<Record<N, Plaintext<N>>>,
+    pub priority_fee_in_microcredits: u64,
 }
 
 impl<N: Network> UseSecret<1> for AleoExecute<N> {

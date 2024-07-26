@@ -25,3 +25,5 @@ book
 # exclude cargo fuzz artifacts
 **/fuzz/corpus/*
 **/fuzz/artifacts/
+
+.cargo
