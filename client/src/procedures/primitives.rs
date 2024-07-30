@@ -40,9 +40,9 @@ use zeroize::{Zeroize, Zeroizing};
 use snarkvm_console::{account::{Address as AleoAddress, ComputeKey, GraphKey, PrivateKey as AleoPrivateKey, ViewKey as AleoViewKey}, network::{MainnetV0, Network, TestnetV0}, program::{FromBytes, Identifier, InputID, Plaintext, ProgramID, Record, Request, Signature, ToBytes, Value, ValueType}, types::{Field, U16, U8}};
 use snarkvm_console::prelude::Error as AleoError;
 use snarkvm_console::prelude::*;
-use snarkvm_ledger::query::Query;
-use snarkvm_ledger::store::{ConsensusStore, ConsensusStorage, helpers::memory::ConsensusMemory};
+use snarkvm_ledger::{store::{ConsensusStore, ConsensusStorage, helpers::memory::ConsensusMemory}, query::Query};
 use snarkvm_ledger::block::*;
+use snarkvm_ledger::store::BlockStorage;
 use snarkvm_synthesizer::VM;
 
 
@@ -831,6 +831,7 @@ pub struct AleoExecute<N: Network> {
     pub inputs: Vec<Value<N>>,
     pub fee_record: Option<Record<N, Plaintext<N>>>,
     pub priority_fee_in_microcredits: u64,
+    pub base_url: String,
 }
 
 impl<N: Network> UseSecret<1> for AleoExecute<N> {
@@ -838,10 +839,6 @@ impl<N: Network> UseSecret<1> for AleoExecute<N> {
 
     fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
         let private_key = aleo_secret_key::<N>(guards[0].borrow())?;
-        let base_url = format!(
-            "https://aleo-testnetbeta.obscura.network/v1/{}",
-            env!("TESTNET_API_OBSCURA")
-        );
         let rng = &mut rand::thread_rng();
         let store = ConsensusStore::<N, ConsensusMemory<N>>::open(None)?;
         let vm = VM::<N, ConsensusMemory<N>>::from(store)?;
@@ -853,7 +850,7 @@ impl<N: Network> UseSecret<1> for AleoExecute<N> {
             self.inputs.into_iter(),
             self.fee_record,
             self.priority_fee_in_microcredits,
-            Some(Query::from(base_url)),
+            Some(Query::from(self.base_url)),
             rng,
         )?)
     }
