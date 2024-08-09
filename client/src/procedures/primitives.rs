@@ -842,7 +842,7 @@ impl<N:Network> UseSecret<1> for GetAleoAddress<N>{
 #[serde(bound = "N: Network")]
 pub struct GetAleoViewKey<N: Network>{
     pub private_key: Location,
-    _network: PhantomData<N>,
+    pub _network: PhantomData<N>,
 }
 
 impl<N: Network> UseSecret<1> for GetAleoViewKey<N> {
@@ -863,7 +863,7 @@ impl<N: Network> UseSecret<1> for GetAleoViewKey<N> {
 #[serde(bound = "N: Network")]
 pub struct UnsafeGetAleoPrivateKey<N: Network>{
     pub private_key: Location,
-    _network: PhantomData<N>,
+    pub _network: PhantomData<N>,
 }
 
 impl<N: Network> UseSecret<1> for UnsafeGetAleoPrivateKey<N> {
