@@ -12,6 +12,7 @@ use snarkvm_ledger::block::Transaction;
 
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, string::FromUtf8Error};
+use snarkvm_console::account::{PrivateKey, ViewKey};
 use thiserror::Error as DeriveError;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
@@ -75,6 +76,23 @@ pub trait GenerateSecret: Sized {
         let target = self.target();
         let target = target.clone();
         let Products { output, secret } = self.generate()?;
+        runner.write_to_vault(&target, secret)?;
+        Ok(output)
+    }
+}
+
+/// Trait for procedures that store a new secret.
+pub trait StoreSecret: Sized {
+    type Output;
+
+    fn store(self) -> Result<Products<Self::Output>, FatalProcedureError>;
+
+    fn target(&self) -> &Location;
+
+    fn exec<R: Runner>(self, runner: &R) -> Result<Self::Output, ProcedureError> {
+        let target = self.target();
+        let target = target.clone();
+        let Products { output, secret } = self.store()?;
         runner.write_to_vault(&target, secret)?;
         Ok(output)
     }
@@ -160,6 +178,12 @@ impl From<bip39::Mnemonic> for ProcedureOutput {
     }
 }
 
+impl From<bip39::Passphrase> for ProcedureOutput {
+    fn from(m: bip39::Passphrase) -> Self {
+        m.as_ref().as_bytes().to_vec().into()
+    }
+}
+
 impl<const N: usize> From<[u8; N]> for ProcedureOutput {
     fn from(a: [u8; N]) -> Self {
         a.to_vec().into()
@@ -168,6 +192,18 @@ impl<const N: usize> From<[u8; N]> for ProcedureOutput {
 
 impl<N: Network> From<Transaction<N>> for ProcedureOutput {
     fn from(t: Transaction<N>) -> Self {
+        t.to_bytes_le().unwrap().into()
+    }
+}
+
+impl<N: Network> From<ViewKey<N>> for ProcedureOutput {
+    fn from(t: ViewKey<N>) -> Self {
+        t.to_bytes_le().unwrap().into()
+    }
+}
+
+impl<N: Network> From<PrivateKey<N>> for ProcedureOutput {
+    fn from(t: PrivateKey<N>) -> Self {
         t.to_bytes_le().unwrap().into()
     }
 }
@@ -190,6 +226,13 @@ impl TryFrom<ProcedureOutput> for String {
 }
 
 impl TryFrom<ProcedureOutput> for bip39::Mnemonic {
+    type Error = FromUtf8Error;
+    fn try_from(value: ProcedureOutput) -> Result<Self, Self::Error> {
+        String::try_from(value).map(String::into)
+    }
+}
+
+impl TryFrom<ProcedureOutput> for bip39::Passphrase {
     type Error = FromUtf8Error;
     fn try_from(value: ProcedureOutput) -> Result<Self, Self::Error> {
         String::try_from(value).map(String::into)
