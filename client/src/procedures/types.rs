@@ -231,19 +231,19 @@ impl<const N: usize> TryFrom<ProcedureOutput> for [u8; N] {
 }
 
 macro_rules! impl_from_aleo_type {
-    ($($type:ty),*) => {
+    ($($type:ty),+) => {
         $(
             impl<N: Network> From<$type> for ProcedureOutput {
                 fn from(t: $type) -> Self {
                     t.to_bytes_le().unwrap().into()
                 }
             }
-        )*
+        )+
     };
 }
 
 macro_rules! impl_try_from_aleo_type {
-    ($($struct:ident),*) => {
+    ($($struct:ident),+) => {
         $(
             impl<N: Network> TryFrom<ProcedureOutput> for $struct<N> {
                 type Error = FromUtf8Error;
@@ -251,7 +251,7 @@ macro_rules! impl_try_from_aleo_type {
                     Ok($struct::from_bytes_le(&value.0).unwrap())
                 }
             }
-        )*
+        )+
     };
 }
 
