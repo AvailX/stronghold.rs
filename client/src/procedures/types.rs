@@ -7,12 +7,13 @@ use engine::{
     runtime::memories::buffer::Buffer,
     vault::{BoxProvider, VaultId},
 };
-use snarkvm_console::prelude::{Error as AleoError, Network, ToBytes};
+use snarkvm_console::prelude::{Error as AleoError, Network, ToBytes, FromBytes};
 use snarkvm_ledger::block::Transaction;
 
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, string::FromUtf8Error};
 use snarkvm_console::account::{PrivateKey, ViewKey};
+use snarkvm_synthesizer::Authorization;
 use thiserror::Error as DeriveError;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
@@ -190,24 +191,6 @@ impl<const N: usize> From<[u8; N]> for ProcedureOutput {
     }
 }
 
-impl<N: Network> From<Transaction<N>> for ProcedureOutput {
-    fn from(t: Transaction<N>) -> Self {
-        t.to_bytes_le().unwrap().into()
-    }
-}
-
-impl<N: Network> From<ViewKey<N>> for ProcedureOutput {
-    fn from(t: ViewKey<N>) -> Self {
-        t.to_bytes_le().unwrap().into()
-    }
-}
-
-impl<N: Network> From<PrivateKey<N>> for ProcedureOutput {
-    fn from(t: PrivateKey<N>) -> Self {
-        t.to_bytes_le().unwrap().into()
-    }
-}
-
 impl From<ProcedureOutput> for () {
     fn from(_: ProcedureOutput) -> Self {}
 }
@@ -246,6 +229,34 @@ impl<const N: usize> TryFrom<ProcedureOutput> for [u8; N] {
         value.0.clone().try_into()
     }
 }
+
+macro_rules! impl_from_aleo_type {
+    ($($type:ty),*) => {
+        $(
+            impl<N: Network> From<$type> for ProcedureOutput {
+                fn from(t: $type) -> Self {
+                    t.to_bytes_le().unwrap().into()
+                }
+            }
+        )*
+    };
+}
+
+macro_rules! impl_try_from_aleo_type {
+    ($($struct:ident),*) => {
+        $(
+            impl<N: Network> TryFrom<ProcedureOutput> for $struct<N> {
+                type Error = FromUtf8Error;
+                fn try_from(value: ProcedureOutput) -> Result<Self, Self::Error> {
+                    Ok($struct::from_bytes_le(&value.0).unwrap())
+                }
+            }
+        )*
+    };
+}
+
+impl_from_aleo_type!(Authorization<N>, Transaction<N>, ViewKey<N>, PrivateKey<N>);
+impl_try_from_aleo_type!(Authorization, Transaction, ViewKey, PrivateKey);
 
 /// Error on procedure execution.
 #[derive(DeriveError, Debug, Clone, Serialize, Deserialize)]

@@ -44,7 +44,7 @@ use snarkvm_console::prelude::*;
 use snarkvm_ledger::{store::{ConsensusStore, ConsensusStorage, helpers::memory::ConsensusMemory}, query::Query};
 use snarkvm_ledger::block::*;
 use snarkvm_ledger::store::BlockStorage;
-use snarkvm_synthesizer::VM;
+use snarkvm_synthesizer::{VM, process::Authorization};
 
 
 /// Enum that wraps all cryptographic procedures that are supported by Stronghold.
@@ -74,6 +74,9 @@ pub enum StrongholdProcedure<N:Network> {
     Secp256k1EcdsaSign(Secp256k1EcdsaSign),
     AleoSign(AleoSign<N>),
     AleoSignRequest(AleoSignRequest<N>),
+    AleoAuthorize(AleoAuthorize<N>),
+    AleoAuthorizeFeePrivate(AleoAuthorizeFeePrivate<N>),
+    AleoAuthorizeFeePublic(AleoAuthorizeFeePublic<N>),
     AleoExecute(AleoExecute<N>),
     X25519DiffieHellman(X25519DiffieHellman),
     Hmac(Hmac),
@@ -109,14 +112,17 @@ impl<N:Network> Procedure for StrongholdProcedure<N> {
             GenerateKey(proc) => proc.execute(runner).map(|o| o.into()),
             PublicKey(proc) => proc.execute(runner).map(|o| o.into()),
             GetEvmAddress(proc) => proc.execute(runner).map(|o| o.into()),
-            GetAleoAddress(proc) => proc.exec(runner).map(|o| o.into()),
-            GetAleoViewKey(proc) => proc.exec(runner).map(|o| o.into()),
-            UnsafeGetAleoPrivateKey(proc) => proc.exec(runner).map(|o| o.into()),
+            GetAleoAddress(proc) => proc.execute(runner).map(|o| o.into()),
+            GetAleoViewKey(proc) => proc.execute(runner).map(|o| o.into()),
+            UnsafeGetAleoPrivateKey(proc) => proc.execute(runner).map(|o| o.into()),
             Ed25519Sign(proc) => proc.execute(runner).map(|o| o.into()),
             Secp256k1EcdsaSign(proc) => proc.execute(runner).map(|o| o.into()),
-            AleoSign(proc) => proc.exec(runner).map(|o| o.into()),
-            AleoSignRequest(proc) => proc.exec(runner).map(|o| o.into()),
-            AleoExecute(proc) => proc.exec(runner).map(|o| o.into()),
+            AleoSign(proc) => proc.execute(runner).map(|o| o.into()),
+            AleoSignRequest(proc) => proc.execute(runner).map(|o| o.into()),
+            AleoAuthorize(proc) => proc.execute(runner).map(|o| o.into()),
+            AleoAuthorizeFeePublic(proc) => proc.execute(runner).map(|o| o.into()),
+            AleoAuthorizeFeePrivate(proc) => proc.execute(runner).map(|o| o.into()),
+            AleoExecute(proc) => proc.execute(runner).map(|o| o.into()),
             X25519DiffieHellman(proc) => proc.execute(runner).map(|o| o.into()),
             Hmac(proc) => proc.execute(runner).map(|o| o.into()),
             Hkdf(proc) => proc.execute(runner).map(|o| o.into()),
@@ -126,10 +132,10 @@ impl<N:Network> Procedure for StrongholdProcedure<N> {
             Pbkdf2Hmac(proc) => proc.execute(runner).map(|o| o.into()),
             AeadEncrypt(proc) => proc.execute(runner).map(|o| o.into()),
             AeadDecrypt(proc) => proc.execute(runner).map(|o| o.into()),
-            ConcatSecret(proc) => proc.exec(runner).map(|o| o.into()),
+            ConcatSecret(proc) => proc.execute(runner).map(|o| o.into()),
 
             #[cfg(feature = "insecure")]
-            CompareSecret(proc) => proc.exec(runner).map(|o| o.into()),
+            CompareSecret(proc) => proc.execute(runner).map(|o| o.into()),
         }
     }
 }
@@ -153,6 +159,10 @@ impl<N:Network> StrongholdProcedure<N> {
             | StrongholdProcedure::Ed25519Sign(Ed25519Sign { private_key: input, .. })
             | StrongholdProcedure::Secp256k1EcdsaSign(Secp256k1EcdsaSign { private_key: input, .. })
             | StrongholdProcedure::AleoSign(AleoSign { private_key: input, .. })
+            | StrongholdProcedure::AleoSignRequest(AleoSignRequest { private_key: input, .. })
+            | StrongholdProcedure::AleoAuthorize(AleoAuthorize { private_key: input, .. })
+            | StrongholdProcedure::AleoAuthorizeFeePrivate(AleoAuthorizeFeePrivate { private_key: input, .. })
+            | StrongholdProcedure::AleoAuthorizeFeePublic(AleoAuthorizeFeePublic { private_key: input, .. })
             | StrongholdProcedure::AleoExecute(AleoExecute{ private_key: input, .. })
             | StrongholdProcedure::GetAleoViewKey(GetAleoViewKey { private_key: input, .. })
             | StrongholdProcedure::UnsafeGetAleoPrivateKey(UnsafeGetAleoPrivateKey { private_key: input, .. })
@@ -219,6 +229,36 @@ macro_rules! procedures {
 }
 
 #[macro_export]
+macro_rules! procedures_network {
+    { _ => { $($Proc:ident<N>),+ }} => {
+        $(
+            impl<N: Network> From<$Proc<N>> for StrongholdProcedure<N> {
+                fn from(proc: $Proc<N>) -> Self {
+                    StrongholdProcedure::$Proc(proc)
+                }
+            }
+        )+
+    };
+    { $Trait:ident => { $($Proc:ident<N>),+ }} => {
+        $(
+            impl<N: Network> Procedure for $Proc<N> {
+                type Output = <$Proc<N> as $Trait>::Output;
+
+                fn execute<R: Runner>(self, runner: &R) -> Result<Self::Output, ProcedureError> {
+                    self.exec(runner)
+                }
+            }
+        )+
+        procedures!(_ => { $($Proc<N>),+ });
+    };
+    { $($Trait:tt => { $($Proc:ident<N>),+ }),+} => {
+        $(
+            procedures_network!($Trait => { $($Proc<N>),+ } );
+        )+
+    };
+}
+
+#[macro_export]
 macro_rules! generic_procedures {
     { $Trait:ident<$n:literal> => { $($Proc:ident),+ }} => {
         $(
@@ -239,13 +279,31 @@ macro_rules! generic_procedures {
     };
 }
 
+#[macro_export]
+macro_rules! generic_procedures_network {
+    { $Trait:ident<$n:literal> => { $($Proc:ident<N>),+ }} => {
+        $(
+            impl<N: Network> Procedure for $Proc<N> {
+                type Output = <$Proc<N> as $Trait<$n>>::Output;
+
+                fn execute<R: Runner>(self, runner: &R) -> Result<Self::Output, ProcedureError> {
+                    self.exec(runner)
+                }
+            }
+        )+
+        procedures_network!(_ => { $($Proc<N>),+ });
+    };
+    { $($Trait:tt<$n:literal> => { $($Proc:ident<N>),+ }),+} => {
+        $(
+            generic_procedures_network!($Trait<$n> => { $($Proc<N>),+ } );
+        )+
+    };
+}
 
 #[cfg(feature = "insecure")]
 generic_procedures! {
     UseSecret<1> => { CompareSecret }
 }
-
-
 
 generic_procedures! {
     // Stronghold procedures that implement the `UseSecret` trait.
@@ -256,6 +314,13 @@ generic_procedures! {
     DeriveSecret<2> => { ConcatSecret }
 }
 
+generic_procedures_network! {
+    UseSecret<1> => {
+        GetAleoAddress<N>, GetAleoViewKey<N>, UnsafeGetAleoPrivateKey<N>, AleoSign<N>, AleoSignRequest<N>,
+        AleoAuthorize<N>, AleoAuthorizeFeePrivate<N>, AleoAuthorizeFeePublic<N>, AleoExecute<N>
+    }
+}
+
 procedures! {
     // Stronghold procedures that implement the `GenerateSecret` trait.
     GenerateSecret => { WriteVault, BIP39Generate, BIP39Recover, Slip10Generate, GenerateKey, Pbkdf2Hmac },
@@ -264,8 +329,6 @@ procedures! {
     // Stronghold procedures that directly implement the `Procedure` trait.
     _ => { RevokeData, GarbageCollect }
 }
-
-
 
 /// Write data to the specified [`Location`].
 #[derive(Clone, GuardDebug, Serialize, Deserialize)]
@@ -918,6 +981,107 @@ pub struct Secp256k1EcdsaSign {
     pub private_key: Location,
 }
 
+#[derive(Debug,Clone,Serialize,Deserialize)]
+#[serde(bound = "N: Network")]
+pub struct AleoAuthorize<N: Network> {
+    pub private_key: Location,
+    pub program_id: ProgramID<N>,
+    pub function_name: Identifier<N>,
+    pub inputs: Vec<Value<N>>,
+    pub base_url: String,
+}
+
+impl<N: Network> UseSecret<1> for AleoAuthorize<N> {
+    type Output = Authorization<N>;
+
+    fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
+        let private_key = aleo_secret_key::<N>(guards[0].borrow())?;
+        let rng = &mut rand::thread_rng();
+        let store = ConsensusStore::<N, ConsensusMemory<N>>::open(None)?;
+        let vm = VM::<N, ConsensusMemory<N>>::from(store)?;
+
+        Ok(
+            vm.authorize(
+                &private_key,
+                self.program_id,
+                self.function_name,
+                self.inputs.into_iter(),
+                rng,
+            )?)
+    }
+
+    fn source(&self) -> [Location; 1] {
+        [self.private_key.clone()]
+    }
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize)]
+#[serde(bound = "N: Network")]
+pub struct AleoAuthorizeFeePublic<N: Network> {
+    pub private_key: Location,
+    pub base_fee_in_microcredits: u64,
+    pub priority_fee_in_microcredits: u64,
+    pub deployment_or_execution_id: Field<N>,
+}
+
+impl<N: Network> UseSecret<1> for AleoAuthorizeFeePublic<N> {
+    type Output = Authorization<N>;
+
+    fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
+        let private_key = aleo_secret_key::<N>(guards[0].borrow())?;
+        let rng = &mut rand::thread_rng();
+        let store = ConsensusStore::<N, ConsensusMemory<N>>::open(None)?;
+        let vm = VM::<N, ConsensusMemory<N>>::from(store)?;
+
+        Ok(
+            vm.authorize_fee_public(
+                &private_key,
+                self.base_fee_in_microcredits,
+                self.priority_fee_in_microcredits,
+                self.deployment_or_execution_id,
+                rng,
+            )?)
+    }
+
+    fn source(&self) -> [Location; 1] {
+        [self.private_key.clone()]
+    }
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize)]
+#[serde(bound = "N: Network")]
+pub struct AleoAuthorizeFeePrivate<N: Network> {
+    pub private_key: Location,
+    pub credits: Record<N, Plaintext<N>>,
+    pub base_fee_in_microcredits: u64,
+    pub priority_fee_in_microcredits: u64,
+    pub deployment_or_execution_id: Field<N>,
+}
+
+impl<N: Network> UseSecret<1> for AleoAuthorizeFeePrivate<N> {
+    type Output = Authorization<N>;
+
+    fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
+        let private_key = aleo_secret_key::<N>(guards[0].borrow())?;
+        let rng = &mut rand::thread_rng();
+        let store = ConsensusStore::<N, ConsensusMemory<N>>::open(None)?;
+        let vm = VM::<N, ConsensusMemory<N>>::from(store)?;
+
+        Ok(
+            vm.authorize_fee_private(
+                &private_key,
+                self.credits,
+                self.base_fee_in_microcredits,
+                self.priority_fee_in_microcredits,
+                self.deployment_or_execution_id,
+                rng,
+            )?)
+    }
+
+    fn source(&self) -> [Location; 1] {
+        [self.private_key.clone()]
+    }
+}
 
 #[derive(Debug,Clone,Serialize,Deserialize)]
 #[serde(bound = "N: Network")]
