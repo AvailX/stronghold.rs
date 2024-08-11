@@ -988,7 +988,6 @@ pub struct AleoAuthorize<N: Network> {
     pub program_id: ProgramID<N>,
     pub function_name: Identifier<N>,
     pub inputs: Vec<Value<N>>,
-    pub base_url: String,
 }
 
 impl<N: Network> UseSecret<1> for AleoAuthorize<N> {
