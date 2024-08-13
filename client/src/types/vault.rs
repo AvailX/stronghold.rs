@@ -77,7 +77,6 @@ impl ClientVault {
     /// # Security
     ///
     /// THE CALL TO THIS METHOD IS INSECURE AS IT WILL EXPOSE SECRETS STORED INSIDE A VAULT.
-    #[cfg(test)]
     pub fn read_secret<P>(&self, record_path: P) -> Result<Zeroizing<Vec<u8>>, ClientError>
     where
         P: AsRef<[u8]>,
