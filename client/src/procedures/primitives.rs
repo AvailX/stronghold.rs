@@ -794,12 +794,7 @@ fn secp256k1_ecdsa_secret_key(raw: Ref<u8>) -> Result<secp256k1_ecdsa::SecretKey
 }
 
 fn aleo_secret_key<N:Network>(raw: Ref<u8>) -> Result<AleoPrivateKey<N>,AleoError>{
-    let raw_slice: &[u8] = &raw;
-    if raw_slice.len() < 128 {
-        // Return buffer size error
-    }
-
-    let field = <N as Environment>::Field::from_bytes_le_mod_order(raw_slice);
+    let field = <N as Environment>::Field::from_bytes_le_mod_order(raw.as_ref());
     AleoPrivateKey::<N>::try_from(FromBytes::read_le(&*field.to_bytes_le().unwrap()).unwrap())
 }
 
