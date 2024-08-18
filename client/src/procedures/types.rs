@@ -7,13 +7,13 @@ use engine::{
     runtime::memories::buffer::Buffer,
     vault::{BoxProvider, VaultId},
 };
-use snarkvm_console::prelude::{Error as AleoError, Network, ToBytes, FromBytes};
+use snarkvm_console::prelude::{Error as AleoError, FromBytes, Network, ToBytes};
 use snarkvm_ledger::block::Transaction;
 
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, string::FromUtf8Error};
 use snarkvm_console::account::{PrivateKey, ViewKey};
 use snarkvm_synthesizer::Authorization;
+use std::{fmt::Debug, string::FromUtf8Error};
 use thiserror::Error as DeriveError;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
@@ -135,7 +135,7 @@ pub trait UseSecret<const T: usize>: Sized {
     }
 }
 
-pub trait UseSecretNetwork<const T: usize, N:Network>: Sized {
+pub trait UseSecretNetwork<const T: usize, N: Network>: Sized {
     type Output;
 
     fn use_secret(self, guard: [Buffer<u8>; T]) -> Result<Self::Output, FatalProcedureError>;

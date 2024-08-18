@@ -27,7 +27,6 @@ use zeroize::Zeroize;
 
 use snarkvm_console::prelude::Network;
 
-
 #[derive(Clone, GuardDebug)]
 pub struct Client {
     // A keystore
@@ -227,7 +226,7 @@ impl Client {
     /// A cryptographic [`Procedure`] is the main operation on secrets.
     ///
     /// # Example
-    pub fn execute_procedure<P,N>(&self, procedure: P) -> Result<P::Output, ProcedureError>
+    pub fn execute_procedure<P, N>(&self, procedure: P) -> Result<P::Output, ProcedureError>
     where
         P: Procedure + Into<StrongholdProcedure<N>>,
         N: Network,
@@ -240,7 +239,7 @@ impl Client {
     /// Executes a list of cryptographic [`crate::procedures::Procedure`]s sequentially and returns a collected output
     ///
     /// # Example
-    pub fn execute_procedure_chained<N:Network>(
+    pub fn execute_procedure_chained<N: Network>(
         &self,
         procedures: Vec<StrongholdProcedure<N>>,
     ) -> core::result::Result<Vec<ProcedureOutput>, ProcedureError> {

@@ -1,8 +1,8 @@
 // Copyright 2020-2021 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{convert::TryInto, str::FromStr, thread::Thread};
 use std::marker::PhantomData;
+use std::{convert::TryInto, str::FromStr, thread::Thread};
 
 use super::types::*;
 use crate::{derive_record_id, derive_vault_id, Client, ClientError, Location, UseKey};
@@ -38,14 +38,23 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use stronghold_utils::GuardDebug;
 use zeroize::{Zeroize, Zeroizing};
 
-use snarkvm_console::{account::{Address as AleoAddress, ComputeKey, GraphKey, PrivateKey as AleoPrivateKey, ViewKey as AleoViewKey}, network::{MainnetV0, Network, TestnetV0}, program::{FromBytes, Identifier, InputID, Plaintext, ProgramID, Record, Request, Signature, ToBytes, Value, ValueType}, types::{Field, U16, U8}};
 use snarkvm_console::prelude::Error as AleoError;
 use snarkvm_console::prelude::*;
-use snarkvm_ledger::{store::{ConsensusStore, ConsensusStorage, helpers::memory::ConsensusMemory}, query::Query};
+use snarkvm_console::{
+    account::{Address as AleoAddress, ComputeKey, GraphKey, PrivateKey as AleoPrivateKey, ViewKey as AleoViewKey},
+    network::{MainnetV0, Network, TestnetV0},
+    program::{
+        FromBytes, Identifier, InputID, Plaintext, ProgramID, Record, Request, Signature, ToBytes, Value, ValueType,
+    },
+    types::{Field, U16, U8},
+};
 use snarkvm_ledger::block::*;
 use snarkvm_ledger::store::BlockStorage;
-use snarkvm_synthesizer::{VM, process::Authorization};
-
+use snarkvm_ledger::{
+    query::Query,
+    store::{helpers::memory::ConsensusMemory, ConsensusStorage, ConsensusStore},
+};
+use snarkvm_synthesizer::{process::Authorization, VM};
 
 /// Enum that wraps all cryptographic procedures that are supported by Stronghold.
 ///
@@ -53,7 +62,7 @@ use snarkvm_synthesizer::{VM, process::Authorization};
 /// or generates a new secret.
 #[derive(Clone, GuardDebug, Serialize, Deserialize)]
 #[serde(bound = "N: Network")]
-pub enum StrongholdProcedure<N:Network> {
+pub enum StrongholdProcedure<N: Network> {
     WriteVault(WriteVault),
     RevokeData(RevokeData),
     GarbageCollect(GarbageCollect),
@@ -93,7 +102,7 @@ pub enum StrongholdProcedure<N:Network> {
     CompareSecret(CompareSecret),
 }
 
-impl<N:Network> Procedure for StrongholdProcedure<N> {
+impl<N: Network> Procedure for StrongholdProcedure<N> {
     type Output = ProcedureOutput;
 
     fn execute<R: Runner>(self, runner: &R) -> Result<Self::Output, ProcedureError> {
@@ -140,19 +149,19 @@ impl<N:Network> Procedure for StrongholdProcedure<N> {
     }
 }
 
-impl<N:Network> StrongholdProcedure<N> {
+impl<N: Network> StrongholdProcedure<N> {
     pub(crate) fn input(&self) -> Option<Location> {
         match self {
             StrongholdProcedure::CopyRecord(CopyRecord { source: input, .. })
             | StrongholdProcedure::UnsafeGetBIP39Mnemonic(UnsafeGetBIP39Mnemonic { mnemonic: input })
             | StrongholdProcedure::Slip10Derive(Slip10Derive {
-                                                    input: Slip10DeriveInput::Seed(input),
-                                                    ..
-                                                })
+                input: Slip10DeriveInput::Seed(input),
+                ..
+            })
             | StrongholdProcedure::Slip10Derive(Slip10Derive {
-                                                    input: Slip10DeriveInput::Key(input),
-                                                    ..
-                                                })
+                input: Slip10DeriveInput::Key(input),
+                ..
+            })
             | StrongholdProcedure::PublicKey(PublicKey { private_key: input, .. })
             | StrongholdProcedure::GetEvmAddress(GetEvmAddress { private_key: input })
             | StrongholdProcedure::GetAleoAddress(GetAleoAddress { private_key: input, .. })
@@ -163,7 +172,7 @@ impl<N:Network> StrongholdProcedure<N> {
             | StrongholdProcedure::AleoAuthorize(AleoAuthorize { private_key: input, .. })
             | StrongholdProcedure::AleoAuthorizeFeePrivate(AleoAuthorizeFeePrivate { private_key: input, .. })
             | StrongholdProcedure::AleoAuthorizeFeePublic(AleoAuthorizeFeePublic { private_key: input, .. })
-            | StrongholdProcedure::AleoExecute(AleoExecute{ private_key: input, .. })
+            | StrongholdProcedure::AleoExecute(AleoExecute { private_key: input, .. })
             | StrongholdProcedure::GetAleoViewKey(GetAleoViewKey { private_key: input, .. })
             | StrongholdProcedure::UnsafeGetAleoPrivateKey(UnsafeGetAleoPrivateKey { private_key: input, .. })
             | StrongholdProcedure::X25519DiffieHellman(X25519DiffieHellman { private_key: input, .. })
@@ -541,7 +550,7 @@ impl StoreSecret for BIP39Store {
 /// Export a BIP39 mnemonic sentence (optionally protected by a passphrase) in the `output` location
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnsafeGetBIP39Mnemonic{
+pub struct UnsafeGetBIP39Mnemonic {
     pub mnemonic: Location,
 }
 
@@ -549,7 +558,9 @@ impl UseSecret<1> for UnsafeGetBIP39Mnemonic {
     type Output = bip39::Mnemonic;
 
     fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
-        Ok(bip39::Mnemonic::from(String::from_utf8(guards[0].borrow().to_vec()).unwrap()))
+        Ok(bip39::Mnemonic::from(
+            String::from_utf8(guards[0].borrow().to_vec()).unwrap(),
+        ))
     }
 
     fn source(&self) -> [Location; 1] {
@@ -626,7 +637,7 @@ pub enum Slip10DeriveInput {
 pub enum Curve {
     Secp256k1,
     Ed25519,
-    Aleo //BLS12_377
+    Aleo, //BLS12_377
 }
 
 /// Derive a SLIP10 child key from a seed or a parent key, store it in output location and
@@ -689,14 +700,18 @@ impl DeriveSecret<1> for Slip10Derive {
                     }
                     Curve::Aleo => {
                         let hardened_chain = try_into_hardened_chain(self.chain)?;
-                        match self.network.as_str(){
-                            "mainnet" => slip10::Slip10::<AleoPrivateKey<MainnetV0>>::try_from_extended_bytes(&ext_bytes)
-                            .map(|parent| parent.derive(hardened_chain.into_iter()))
-                            .map(get_result),
-                            "testnet" => slip10::Slip10::<AleoPrivateKey<TestnetV0>>::try_from_extended_bytes(&ext_bytes)
-                            .map(|parent| parent.derive(hardened_chain.into_iter()))
-                            .map(get_result),
-                            _ => return Err(FatalProcedureError::from("Invalid network".to_owned()))
+                        match self.network.as_str() {
+                            "mainnet" => {
+                                slip10::Slip10::<AleoPrivateKey<MainnetV0>>::try_from_extended_bytes(&ext_bytes)
+                                    .map(|parent| parent.derive(hardened_chain.into_iter()))
+                                    .map(get_result)
+                            }
+                            "testnet" => {
+                                slip10::Slip10::<AleoPrivateKey<TestnetV0>>::try_from_extended_bytes(&ext_bytes)
+                                    .map(|parent| parent.derive(hardened_chain.into_iter()))
+                                    .map(get_result)
+                            }
+                            _ => return Err(FatalProcedureError::from("Invalid network".to_owned())),
                         }
                     }
                 }
@@ -726,7 +741,7 @@ impl DeriveSecret<1> for Slip10Derive {
                                 .derive::<AleoPrivateKey<TestnetV0>, _>(hardened_chain.into_iter());
                             Ok(get_result(dk))
                         }
-                        _ => return Err(FatalProcedureError::from("Invalid network".to_owned()))
+                        _ => return Err(FatalProcedureError::from("Invalid network".to_owned())),
                     }
                 }
             },
@@ -793,7 +808,7 @@ fn secp256k1_ecdsa_secret_key(raw: Ref<u8>) -> Result<secp256k1_ecdsa::SecretKey
     secp256k1_ecdsa::SecretKey::try_from_bytes(raw_slice[..secp256k1_ecdsa::SecretKey::LENGTH].try_into().unwrap())
 }
 
-fn aleo_secret_key<N:Network>(raw: Ref<u8>) -> Result<AleoPrivateKey<N>,AleoError>{
+fn aleo_secret_key<N: Network>(raw: Ref<u8>) -> Result<AleoPrivateKey<N>, AleoError> {
     // First 32 bytes are the secret key and last 32 bytes are the chain code
     let child_key = &raw[..32];
     let field = <N as Environment>::Field::from_bytes_le_mod_order(child_key);
@@ -862,7 +877,7 @@ pub struct GetEvmAddress {
     pub private_key: Location,
 }
 
-impl UseSecret<1>  for GetEvmAddress {
+impl UseSecret<1> for GetEvmAddress {
     type Output = [u8; 20];
 
     fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
@@ -877,19 +892,19 @@ impl UseSecret<1>  for GetEvmAddress {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "N: Network")]
-pub struct GetAleoAddress<N:Network>{
+pub struct GetAleoAddress<N: Network> {
     pub ext: Identifier<N>,
     pub private_key: Location,
 }
 
-impl<N:Network> UseSecret<1> for GetAleoAddress<N>{
-    type Output = [u8;32];
+impl<N: Network> UseSecret<1> for GetAleoAddress<N> {
+    type Output = [u8; 32];
 
     fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
         let sk = aleo_secret_key::<N>(guards[0].borrow())?;
-        let address =AleoAddress::try_from(&sk).unwrap();
+        let address = AleoAddress::try_from(&sk).unwrap();
         let addr_bytes = address.to_bytes_le()?;
-        let addr_safe : [u8;32] = addr_bytes.try_into().unwrap();
+        let addr_safe: [u8; 32] = addr_bytes.try_into().unwrap();
         Ok(addr_safe)
     }
 
@@ -900,7 +915,7 @@ impl<N:Network> UseSecret<1> for GetAleoAddress<N>{
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "N: Network")]
-pub struct GetAleoViewKey<N: Network>{
+pub struct GetAleoViewKey<N: Network> {
     pub private_key: Location,
     pub _network: PhantomData<N>,
 }
@@ -921,7 +936,7 @@ impl<N: Network> UseSecret<1> for GetAleoViewKey<N> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "N: Network")]
-pub struct UnsafeGetAleoPrivateKey<N: Network>{
+pub struct UnsafeGetAleoPrivateKey<N: Network> {
     pub private_key: Location,
     pub _network: PhantomData<N>,
 }
@@ -949,7 +964,7 @@ pub struct Ed25519Sign {
     pub private_key: Location,
 }
 
-impl UseSecret<1>  for Ed25519Sign {
+impl UseSecret<1> for Ed25519Sign {
     type Output = [u8; ed25519::Signature::LENGTH];
 
     fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
@@ -978,7 +993,7 @@ pub struct Secp256k1EcdsaSign {
     pub private_key: Location,
 }
 
-#[derive(Debug,Clone,Serialize,Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "N: Network")]
 pub struct AleoAuthorize<N: Network> {
     pub private_key: Location,
@@ -996,14 +1011,13 @@ impl<N: Network> UseSecret<1> for AleoAuthorize<N> {
         let store = ConsensusStore::<N, ConsensusMemory<N>>::open(None)?;
         let vm = VM::<N, ConsensusMemory<N>>::from(store)?;
 
-        Ok(
-            vm.authorize(
-                &private_key,
-                self.program_id,
-                self.function_name,
-                self.inputs.into_iter(),
-                rng,
-            )?)
+        Ok(vm.authorize(
+            &private_key,
+            self.program_id,
+            self.function_name,
+            self.inputs.into_iter(),
+            rng,
+        )?)
     }
 
     fn source(&self) -> [Location; 1] {
@@ -1011,7 +1025,7 @@ impl<N: Network> UseSecret<1> for AleoAuthorize<N> {
     }
 }
 
-#[derive(Debug,Clone,Serialize,Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "N: Network")]
 pub struct AleoAuthorizeFeePublic<N: Network> {
     pub private_key: Location,
@@ -1029,14 +1043,13 @@ impl<N: Network> UseSecret<1> for AleoAuthorizeFeePublic<N> {
         let store = ConsensusStore::<N, ConsensusMemory<N>>::open(None)?;
         let vm = VM::<N, ConsensusMemory<N>>::from(store)?;
 
-        Ok(
-            vm.authorize_fee_public(
-                &private_key,
-                self.base_fee_in_microcredits,
-                self.priority_fee_in_microcredits,
-                self.deployment_or_execution_id,
-                rng,
-            )?)
+        Ok(vm.authorize_fee_public(
+            &private_key,
+            self.base_fee_in_microcredits,
+            self.priority_fee_in_microcredits,
+            self.deployment_or_execution_id,
+            rng,
+        )?)
     }
 
     fn source(&self) -> [Location; 1] {
@@ -1044,7 +1057,7 @@ impl<N: Network> UseSecret<1> for AleoAuthorizeFeePublic<N> {
     }
 }
 
-#[derive(Debug,Clone,Serialize,Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "N: Network")]
 pub struct AleoAuthorizeFeePrivate<N: Network> {
     pub private_key: Location,
@@ -1063,15 +1076,14 @@ impl<N: Network> UseSecret<1> for AleoAuthorizeFeePrivate<N> {
         let store = ConsensusStore::<N, ConsensusMemory<N>>::open(None)?;
         let vm = VM::<N, ConsensusMemory<N>>::from(store)?;
 
-        Ok(
-            vm.authorize_fee_private(
-                &private_key,
-                self.credits,
-                self.base_fee_in_microcredits,
-                self.priority_fee_in_microcredits,
-                self.deployment_or_execution_id,
-                rng,
-            )?)
+        Ok(vm.authorize_fee_private(
+            &private_key,
+            self.credits,
+            self.base_fee_in_microcredits,
+            self.priority_fee_in_microcredits,
+            self.deployment_or_execution_id,
+            rng,
+        )?)
     }
 
     fn source(&self) -> [Location; 1] {
@@ -1079,7 +1091,7 @@ impl<N: Network> UseSecret<1> for AleoAuthorizeFeePrivate<N> {
     }
 }
 
-#[derive(Debug,Clone,Serialize,Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "N: Network")]
 pub struct AleoExecute<N: Network> {
     pub private_key: Location,
@@ -1100,8 +1112,7 @@ impl<N: Network> UseSecret<1> for AleoExecute<N> {
         let store = ConsensusStore::<N, ConsensusMemory<N>>::open(None)?;
         let vm = VM::<N, ConsensusMemory<N>>::from(store)?;
 
-        Ok(
-            vm.execute(
+        Ok(vm.execute(
             &private_key,
             (self.program_id, self.function_name),
             self.inputs.into_iter(),
@@ -1117,9 +1128,9 @@ impl<N: Network> UseSecret<1> for AleoExecute<N> {
     }
 }
 
-#[derive(Debug,Clone,Serialize,Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "N: Network")]
-pub struct AleoSignRequest<N:Network>{
+pub struct AleoSignRequest<N: Network> {
     pub program_id: ProgramID<N>,
     pub function_name: Identifier<N>,
     pub inputs: Vec<Value<N>>,
@@ -1129,7 +1140,7 @@ pub struct AleoSignRequest<N:Network>{
     pub private_key: Location,
 }
 
-impl<N:Network> UseSecret<1> for AleoSignRequest<N>{
+impl<N: Network> UseSecret<1> for AleoSignRequest<N> {
     type Output = [u8; 128];
 
     fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
@@ -1143,7 +1154,16 @@ impl<N:Network> UseSecret<1> for AleoSignRequest<N>{
 
         let private_key = aleo_secret_key::<N>(guards[0].borrow())?;
 
-        let request = Request::<N>::sign(&private_key, program_id, function_name, inputs.iter(), &input_types, root_tvk, is_root,&mut rng)?;
+        let request = Request::<N>::sign(
+            &private_key,
+            program_id,
+            function_name,
+            inputs.iter(),
+            &input_types,
+            root_tvk,
+            is_root,
+            &mut rng,
+        )?;
         let request_bytes = request.to_bytes_le()?;
         let sig_safe: [u8; 128] = request_bytes.try_into().unwrap();
         Ok(sig_safe)
@@ -1156,22 +1176,19 @@ impl<N:Network> UseSecret<1> for AleoSignRequest<N>{
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "N: Network")]
-pub struct AleoSign<N:Network>{
+pub struct AleoSign<N: Network> {
     pub msg: Vec<u8>,
     pub ext: Identifier<N>,
     pub private_key: Location,
 }
 
-impl<N:Network> UseSecret<1>  for AleoSign<N> {
+impl<N: Network> UseSecret<1> for AleoSign<N> {
     type Output = [u8; 128];
 
     fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
         let sk = aleo_secret_key::<N>(guards[0].borrow())?;
 
-        println!("Signing message: {:?}", &self.msg);
-        println!("Signing key: {:?}", &sk.to_string());
-
-        let rng = &mut  rand::thread_rng();
+        let rng = &mut rand::thread_rng();
 
         let sig = sk.sign_bytes(&self.msg, rng)?;
 
@@ -1187,8 +1204,7 @@ impl<N:Network> UseSecret<1>  for AleoSign<N> {
     }
 }
 
-
-impl UseSecret<1>  for Secp256k1EcdsaSign {
+impl UseSecret<1> for Secp256k1EcdsaSign {
     type Output = [u8; secp256k1_ecdsa::RecoverableSignature::LENGTH];
 
     fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
@@ -1246,7 +1262,7 @@ pub struct Hmac {
     pub key: Location,
 }
 
-impl UseSecret<1>  for Hmac {
+impl UseSecret<1> for Hmac {
     type Output = Vec<u8>;
 
     fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
@@ -1386,7 +1402,7 @@ pub struct AeadEncrypt {
     pub key: Location,
 }
 
-impl UseSecret<1>  for AeadEncrypt {
+impl UseSecret<1> for AeadEncrypt {
     type Output = Vec<u8>;
 
     fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
@@ -1434,7 +1450,7 @@ pub struct AeadDecrypt {
     pub key: Location,
 }
 
-impl UseSecret<1>  for AeadDecrypt {
+impl UseSecret<1> for AeadDecrypt {
     type Output = Vec<u8>;
 
     fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
@@ -1585,7 +1601,7 @@ pub struct AesKeyWrapEncrypt {
     pub wrap_key: Location,
 }
 
-impl UseSecret<2>  for AesKeyWrapEncrypt {
+impl UseSecret<2> for AesKeyWrapEncrypt {
     type Output = Vec<u8>;
 
     fn use_secret(self, guard: [Buffer<u8>; 2]) -> Result<Self::Output, FatalProcedureError> {
