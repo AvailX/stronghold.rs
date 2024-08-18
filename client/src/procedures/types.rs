@@ -82,23 +82,6 @@ pub trait GenerateSecret: Sized {
     }
 }
 
-/// Trait for procedures that store a new secret.
-pub trait StoreSecret: Sized {
-    type Output;
-
-    fn store(self) -> Result<Products<Self::Output>, FatalProcedureError>;
-
-    fn target(&self) -> &Location;
-
-    fn exec<R: Runner>(self, runner: &R) -> Result<Self::Output, ProcedureError> {
-        let target = self.target();
-        let target = target.clone();
-        let Products { output, secret } = self.store()?;
-        runner.write_to_vault(&target, secret)?;
-        Ok(output)
-    }
-}
-
 /// Trait for procedures that use an existing secret to derive a new one.
 pub trait DeriveSecret<const T: usize>: Sized {
     type Output;

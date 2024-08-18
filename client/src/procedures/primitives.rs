@@ -71,13 +71,10 @@ pub enum StrongholdProcedure<N: Network> {
     Slip10Derive(Slip10Derive),
     BIP39Generate(BIP39Generate),
     BIP39Recover(BIP39Recover),
-    BIP39Store(BIP39Store),
-    UnsafeGetBIP39Mnemonic(UnsafeGetBIP39Mnemonic),
     PublicKey(PublicKey),
     GetEvmAddress(GetEvmAddress),
     GetAleoAddress(GetAleoAddress<N>),
     GetAleoViewKey(GetAleoViewKey<N>),
-    UnsafeGetAleoPrivateKey(UnsafeGetAleoPrivateKey<N>),
     GenerateKey(GenerateKey),
     Ed25519Sign(Ed25519Sign),
     Secp256k1EcdsaSign(Secp256k1EcdsaSign),
@@ -116,14 +113,11 @@ impl<N: Network> Procedure for StrongholdProcedure<N> {
             Slip10Derive(proc) => proc.execute(runner).map(|o| o.into()),
             BIP39Generate(proc) => proc.execute(runner).map(|o| o.into()),
             BIP39Recover(proc) => proc.execute(runner).map(|o| o.into()),
-            BIP39Store(proc) => proc.execute(runner).map(|o| o.into()),
-            UnsafeGetBIP39Mnemonic(proc) => proc.execute(runner).map(|o| o.into()),
             GenerateKey(proc) => proc.execute(runner).map(|o| o.into()),
             PublicKey(proc) => proc.execute(runner).map(|o| o.into()),
             GetEvmAddress(proc) => proc.execute(runner).map(|o| o.into()),
             GetAleoAddress(proc) => proc.execute(runner).map(|o| o.into()),
             GetAleoViewKey(proc) => proc.execute(runner).map(|o| o.into()),
-            UnsafeGetAleoPrivateKey(proc) => proc.execute(runner).map(|o| o.into()),
             Ed25519Sign(proc) => proc.execute(runner).map(|o| o.into()),
             Secp256k1EcdsaSign(proc) => proc.execute(runner).map(|o| o.into()),
             AleoSign(proc) => proc.execute(runner).map(|o| o.into()),
@@ -153,7 +147,6 @@ impl<N: Network> StrongholdProcedure<N> {
     pub(crate) fn input(&self) -> Option<Location> {
         match self {
             StrongholdProcedure::CopyRecord(CopyRecord { source: input, .. })
-            | StrongholdProcedure::UnsafeGetBIP39Mnemonic(UnsafeGetBIP39Mnemonic { mnemonic: input })
             | StrongholdProcedure::Slip10Derive(Slip10Derive {
                 input: Slip10DeriveInput::Seed(input),
                 ..
@@ -174,7 +167,6 @@ impl<N: Network> StrongholdProcedure<N> {
             | StrongholdProcedure::AleoAuthorizeFeePublic(AleoAuthorizeFeePublic { private_key: input, .. })
             | StrongholdProcedure::AleoExecute(AleoExecute { private_key: input, .. })
             | StrongholdProcedure::GetAleoViewKey(GetAleoViewKey { private_key: input, .. })
-            | StrongholdProcedure::UnsafeGetAleoPrivateKey(UnsafeGetAleoPrivateKey { private_key: input, .. })
             | StrongholdProcedure::X25519DiffieHellman(X25519DiffieHellman { private_key: input, .. })
             | StrongholdProcedure::Hkdf(Hkdf { ikm: input, .. })
             | StrongholdProcedure::ConcatKdf(ConcatKdf {
@@ -194,7 +186,6 @@ impl<N: Network> StrongholdProcedure<N> {
             | StrongholdProcedure::Slip10Derive(Slip10Derive { output, .. })
             | StrongholdProcedure::BIP39Generate(BIP39Generate { output, .. })
             | StrongholdProcedure::BIP39Recover(BIP39Recover { output, .. })
-            | StrongholdProcedure::BIP39Store(BIP39Store { output, .. })
             | StrongholdProcedure::GenerateKey(GenerateKey { output, .. })
             | StrongholdProcedure::X25519DiffieHellman(X25519DiffieHellman { shared_key: output, .. })
             | StrongholdProcedure::Hkdf(Hkdf { okm: output, .. })
@@ -316,7 +307,7 @@ generic_procedures! {
 
 generic_procedures! {
     // Stronghold procedures that implement the `UseSecret` trait.
-    UseSecret<1> => { PublicKey, GetEvmAddress, Ed25519Sign, Secp256k1EcdsaSign, Hmac, AeadEncrypt, AeadDecrypt, UnsafeGetBIP39Mnemonic },
+    UseSecret<1> => { PublicKey, GetEvmAddress, Ed25519Sign, Secp256k1EcdsaSign, Hmac, AeadEncrypt, AeadDecrypt },
     UseSecret<2> => { AesKeyWrapEncrypt },
     // Stronghold procedures that implement the `DeriveSecret` trait.
     DeriveSecret<1> => { CopyRecord, Slip10Derive, X25519DiffieHellman, Hkdf, ConcatKdf, AesKeyWrapDecrypt },
@@ -325,7 +316,7 @@ generic_procedures! {
 
 generic_procedures_network! {
     UseSecret<1> => {
-        GetAleoAddress<N>, GetAleoViewKey<N>, UnsafeGetAleoPrivateKey<N>, AleoSign<N>, AleoSignRequest<N>,
+        GetAleoAddress<N>, GetAleoViewKey<N>, AleoSign<N>, AleoSignRequest<N>,
         AleoAuthorize<N>, AleoAuthorizeFeePrivate<N>, AleoAuthorizeFeePublic<N>, AleoExecute<N>
     }
 }
@@ -333,8 +324,6 @@ generic_procedures_network! {
 procedures! {
     // Stronghold procedures that implement the `GenerateSecret` trait.
     GenerateSecret => { WriteVault, BIP39Generate, BIP39Recover, Slip10Generate, GenerateKey, Pbkdf2Hmac },
-    // Stronghold procedures that implement the `StoreSecret` trait.
-    StoreSecret => { BIP39Store },
     // Stronghold procedures that directly implement the `Procedure` trait.
     _ => { RevokeData, GarbageCollect }
 }
@@ -519,52 +508,6 @@ impl GenerateSecret for BIP39Generate {
 
     fn target(&self) -> &Location {
         &self.output
-    }
-}
-
-/// Store a BIP39 mnemonic sentence (optionally protected by a passphrase) in the `output` location
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BIP39Store {
-    #[serde(with = "serde_bip39")]
-    pub passphrase: bip39::Passphrase,
-    #[serde(with = "serde_bip39")]
-    pub mnemonic: bip39::Mnemonic,
-    pub output: Location,
-}
-
-impl StoreSecret for BIP39Store {
-    type Output = bip39::Passphrase;
-
-    fn store(self) -> Result<Products<Self::Output>, FatalProcedureError> {
-        Ok(Products {
-            secret: Zeroizing::new(self.mnemonic.as_bytes().to_vec()),
-            output: self.passphrase,
-        })
-    }
-
-    fn target(&self) -> &Location {
-        &self.output
-    }
-}
-
-/// Export a BIP39 mnemonic sentence (optionally protected by a passphrase) in the `output` location
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnsafeGetBIP39Mnemonic {
-    pub mnemonic: Location,
-}
-
-impl UseSecret<1> for UnsafeGetBIP39Mnemonic {
-    type Output = bip39::Mnemonic;
-
-    fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
-        Ok(bip39::Mnemonic::from(
-            String::from_utf8(guards[0].borrow().to_vec()).unwrap(),
-        ))
-    }
-
-    fn source(&self) -> [Location; 1] {
-        [self.mnemonic.clone()]
     }
 }
 
@@ -927,25 +870,6 @@ impl<N: Network> UseSecret<1> for GetAleoViewKey<N> {
         let sk = aleo_secret_key::<N>(guards[0].borrow())?;
         let viewkey = AleoViewKey::try_from(&sk).unwrap();
         Ok(viewkey)
-    }
-
-    fn source(&self) -> [Location; 1] {
-        [self.private_key.clone()]
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(bound = "N: Network")]
-pub struct UnsafeGetAleoPrivateKey<N: Network> {
-    pub private_key: Location,
-    pub _network: PhantomData<N>,
-}
-
-impl<N: Network> UseSecret<1> for UnsafeGetAleoPrivateKey<N> {
-    type Output = AleoPrivateKey<N>;
-
-    fn use_secret(self, guards: [Buffer<u8>; 1]) -> Result<Self::Output, FatalProcedureError> {
-        Ok(aleo_secret_key::<N>(guards[0].borrow())?)
     }
 
     fn source(&self) -> [Location; 1] {
