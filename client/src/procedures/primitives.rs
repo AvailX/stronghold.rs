@@ -794,7 +794,9 @@ fn secp256k1_ecdsa_secret_key(raw: Ref<u8>) -> Result<secp256k1_ecdsa::SecretKey
 }
 
 fn aleo_secret_key<N:Network>(raw: Ref<u8>) -> Result<AleoPrivateKey<N>,AleoError>{
-    let field = <N as Environment>::Field::from_bytes_le_mod_order(raw.as_ref());
+    // First 32 bytes are the secret key and last 32 bytes are the chain code
+    let child_key = &raw[..32];
+    let field = <N as Environment>::Field::from_bytes_le_mod_order(child_key);
     AleoPrivateKey::<N>::try_from(FromBytes::read_le(&*field.to_bytes_le().unwrap()).unwrap())
 }
 
